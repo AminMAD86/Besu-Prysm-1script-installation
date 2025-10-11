@@ -68,6 +68,8 @@ services:
       - --rpc-http-api=ETH,NET,WEB3
       - --rpc-http-cors-origins=*
       - --host-allowlist=*
+      - --rpc-http-max-active-connections=500
+      - --rpc-http-max-request-content-length=52428800
       - --engine-rpc-enabled=true
       - --engine-host-allowlist=*
       - --engine-jwt-secret=/data/jwt.hex
