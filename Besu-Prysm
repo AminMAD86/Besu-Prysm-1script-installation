@@ -1,0 +1,153 @@
+#!/bin/bash
+# Ethereum Sepolia Node - Full Setup (stream extract, clean output)
+
+set -e
+
+ETHEREUM_DIR="/root/ethereum"
+EXECUTION_DIR="$ETHEREUM_DIR/execution"
+CONSENSUS_DIR="$ETHEREUM_DIR/consensus"
+JWT_FILE="$ETHEREUM_DIR/jwt.hex"
+DOCKER_COMPOSE_FILE="$ETHEREUM_DIR/docker-compose.yml"
+SNAPSHOT_URL="https://snapshots.publicnode.com/ethereum-sepolia-besu-9349545.tar.lz4"
+
+echo ""
+echo "=========================================="
+echo " Ethereum Sepolia Node - Setup Started"
+echo "=========================================="
+echo ""
+
+# 1️⃣ Create directories
+echo "→ Creating directories..."
+mkdir -p "$EXECUTION_DIR" "$CONSENSUS_DIR"
+echo "✅ Directories created."
+echo ""
+
+# 2️⃣ Generate JWT secret
+echo "→ Generating JWT secret..."
+openssl rand -hex 32 > "$JWT_FILE"
+echo "✅ JWT secret generated."
+echo ""
+
+# 3️⃣ Stream download & extract snapshot directly (no temp file)
+echo "→ Downloading & extracting snapshot (this will take a while)..."
+echo "   Target directory: $EXECUTION_DIR"
+cd "$EXECUTION_DIR"
+
+# Stream: download -> decompress -> extract (never saves compressed file)
+wget --progress=bar:force -O - "$SNAPSHOT_URL" | lz4 -d | tar -xf -
+
+echo ""
+echo "✅ Snapshot downloaded and extracted (compressed file not saved)."
+echo ""
+
+# 4️⃣ Create docker-compose.yml
+echo "→ Creating docker-compose.yml..."
+cat > "$DOCKER_COMPOSE_FILE" << 'EOF'
+services:
+  besu:
+    image: hyperledger/besu:latest
+    container_name: besu
+    network_mode: host
+    restart: unless-stopped
+    ports:
+      - 30303:30303
+      - 30303:30303/udp
+      - 8545:8545
+      - 8546:8546
+      - 8551:8551
+    volumes:
+      - /root/ethereum/execution:/data
+      - /root/ethereum/jwt.hex:/data/jwt.hex
+    command:
+      - --network=sepolia
+      - --data-path=/data
+      - --sync-mode=SNAP
+      - --rpc-http-enabled=true
+      - --rpc-http-host=0.0.0.0
+      - --rpc-http-port=8545
+      - --rpc-http-api=ETH,NET,WEB3
+      - --rpc-http-cors-origins=*
+      - --host-allowlist=*
+      - --engine-rpc-enabled=true
+      - --engine-host-allowlist=*
+      - --engine-jwt-secret=/data/jwt.hex
+      - --engine-rpc-port=8551
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  prysm:
+    image: gcr.io/offchainlabs/prysm/beacon-chain:latest
+    container_name: prysm
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - /root/ethereum/consensus:/data
+      - /root/ethereum/jwt.hex:/data/jwt.hex
+    depends_on:
+      - besu
+    ports:
+      - 4000:4000
+      - 3500:3500
+    command:
+      - --sepolia
+      - --execution-endpoint=http://127.0.0.1:8551
+      - --jwt-secret=/data/jwt.hex
+      - --checkpoint-sync-url=https://sepolia.beaconstate.info
+      - --genesis-beacon-api-url=https://sepolia.beaconstate.info
+      - --accept-terms-of-use
+      - --datadir=/data
+      - --rpc-host=0.0.0.0
+      - --rpc-port=4000
+      - --grpc-gateway-corsdomain=*
+      - --grpc-gateway-host=0.0.0.0
+      - --grpc-gateway-port=3500
+      - --monitoring-port=8081
+      - --disable-monitoring
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+EOF
+
+echo "✅ docker-compose.yml created."
+echo ""
+
+# 5️⃣ Start node
+echo "→ Starting Docker containers..."
+cd "$ETHEREUM_DIR"
+docker compose up -d
+echo "✅ Containers started."
+echo ""
+
+# 6️⃣ Firewall setup
+echo "→ Configuring firewall..."
+ufw allow 22 >/dev/null 2>&1 || true
+ufw allow ssh >/dev/null 2>&1 || true
+ufw allow 30303/tcp >/dev/null 2>&1 || true
+ufw allow 30303/udp >/dev/null 2>&1 || true
+ufw allow 13000/tcp >/dev/null 2>&1 || true
+ufw allow 12000/udp >/dev/null 2>&1 || true
+ufw allow from 127.0.0.1 to any port 8545 proto tcp >/dev/null 2>&1 || true
+ufw allow from 127.0.0.1 to any port 3500 proto tcp >/dev/null 2>&1 || true
+ufw deny 8545/tcp >/dev/null 2>&1 || true
+ufw deny 3500/tcp >/dev/null 2>&1 || true
+echo "y" | ufw enable >/dev/null 2>&1 || true
+echo "✅ Firewall configured."
+echo ""
+
+Amin, [10/10/2025 7:50 PM]
+echo ""
+echo "=========================================="
+echo "✅ Setup Complete — Node Running"
+echo "=========================================="
+echo "Besu & Prysm started via Docker."
+echo "Snapshot extracted directly to $EXECUTION_DIR"
+echo "Firewall configured with safe defaults."
+echo ""
+echo "Check logs:"
+echo "  docker compose logs -f"
+echo ""
