@@ -108,6 +108,7 @@ services:
       - --grpc-gateway-port=3500
       - --monitoring-port=8081
       - --disable-monitoring
+      - --subscribe-all-data-subnets
     logging:
       driver: "json-file"
       options:
