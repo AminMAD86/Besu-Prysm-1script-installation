@@ -26,6 +26,15 @@ if ! command -v zstd &> /dev/null; then
 else
     echo "✅ zstd already installed."
 fi
+
+if ! command -v axel &> /dev/null; then
+    echo "⚠️  axel not found. Installing..."
+    apt-get update -qq >/dev/null 2>&1
+    apt-get install -y axel >/dev/null 2>&1
+    echo "✅ axel installed."
+else
+    echo "✅ axel already installed."
+fi
 echo ""
 
 # 2️⃣ Create directories
@@ -47,10 +56,12 @@ echo "   Snapshot: block 9530000 (Oct 30, 2025)"
 cd "$EXECUTION_DIR"
 
 # Stream: download -> decompress -> extract (never saves compressed file)
-# Official ethpandaops.io method: tar -I zstd handles decompression
-wget --progress=bar:force:noscroll --no-check-certificate \
-  --tries=0 --retry-connrefused \
-  -O - "$SNAPSHOT_URL" | \
+# Using axel for parallel downloads (much faster than wget)
+# -n 10: Use 10 parallel connections
+# -o -: Output to stdout for streaming
+# -a: Alternate progress bar
+# --insecure: Skip SSL certificate verification (like --no-check-certificate)
+axel --num-connections=10 --output=- --alternate --insecure "$SNAPSHOT_URL" | \
   tar -I zstd -xvf - -C "$EXECUTION_DIR"
 
 echo ""
