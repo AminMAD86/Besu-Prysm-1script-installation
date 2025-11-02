@@ -9,7 +9,8 @@ EXECUTION_DIR="$ETHEREUM_DIR/execution"
 CONSENSUS_DIR="$ETHEREUM_DIR/consensus"
 JWT_FILE="$ETHEREUM_DIR/jwt.hex"
 DOCKER_COMPOSE_FILE="$ETHEREUM_DIR/docker-compose.yml"
-SNAPSHOT_URL="https://snapshots.ethpandaops.io/sepolia/besu/9540000/snapshot.tar.zst"
+BESU_SNAPSHOT_URL="https://snapshots.ethpandaops.io/sepolia/besu/9540000/snapshot.tar.zst"
+PRYSM_SNAPSHOT_URL="https://snapshots.publicnode.com/ethereum-sepolia-prysm-8857876.tar.lz4"
 
 echo ""
 echo "=========================================="
@@ -45,6 +46,15 @@ if ! command -v wget &> /dev/null; then
 else
     echo "✅ wget already installed."
 fi
+
+if ! command -v lz4 &> /dev/null; then
+    echo "⚠️  lz4 not found. Installing..."
+    apt-get update -qq >/dev/null 2>&1
+    apt-get install -y lz4 >/dev/null 2>&1
+    echo "✅ lz4 installed."
+else
+    echo "✅ lz4 already installed."
+fi
 echo ""
 
 # 2️⃣ Create directories
@@ -65,13 +75,13 @@ if [ -d "$EXECUTION_DIR/database" ] && [ "$(ls -A $EXECUTION_DIR/database/*.sst 
     echo "→ Snapshot already extracted, skipping download..."
     echo "   Database found at: $EXECUTION_DIR/database"
 else
-    echo "→ Downloading & extracting snapshot (this will take a while)..."
+    echo "→ Downloading & extracting Besu snapshot (this will take a while)..."
     echo "   Target directory: $EXECUTION_DIR"
     echo "   Snapshot: block 9540000"
     cd "$EXECUTION_DIR"
     
     # Stream: download -> progress -> decompress -> extract (never saves compressed file)
-    wget -q -O - "$SNAPSHOT_URL" | \
+    wget -q -O - "$BESU_SNAPSHOT_URL" | \
       pv | \
       zstd -d -T0 | \
       tar -xf - -C "$EXECUTION_DIR"
@@ -83,8 +93,33 @@ else
         exit 1
     fi
     
-    echo ""
-    echo "✅ Snapshot downloaded and extracted (compressed file not saved)."
+echo ""
+echo "✅ Besu snapshot downloaded and extracted (compressed file not saved)."
+echo ""
+fi
+
+# 4.5: Download & extract Prysm snapshot (optional - faster sync)
+if [ -d "$CONSENSUS_DIR/beaconchaindata" ] && [ -f "$CONSENSUS_DIR/beaconchaindata/beaconchain.db" ]; then
+    echo "→ Prysm database already exists, skipping snapshot download..."
+else
+    echo "→ Downloading & extracting Prysm snapshot (optional but faster)..."
+    echo "   Target directory: $CONSENSUS_DIR"
+    echo "   Snapshot: slot 8857876 (closer to current head = less forkchoice errors)"
+    cd "$CONSENSUS_DIR"
+    
+    # Stream: download -> progress -> decompress -> extract (never saves compressed file)
+    wget -q -O - "$PRYSM_SNAPSHOT_URL" | \
+      pv | \
+      lz4 -d | \
+      tar -xf -
+    
+    if [ $? -ne 0 ]; then
+        echo ""
+        echo "⚠️  Prysm snapshot download failed (will use checkpoint sync instead)"
+    else
+        echo ""
+        echo "✅ Prysm snapshot downloaded and extracted (compressed file not saved)."
+    fi
     echo ""
 fi
 
@@ -162,6 +197,7 @@ services:
     command:
       - --sepolia
       - --execution-endpoint=http://127.0.0.1:8551
+      - --engine-endpoint-timeout-seconds=60
       - --jwt-secret=/data/jwt.hex
       - --checkpoint-sync-url=https://sepolia.beaconstate.info
       - --genesis-beacon-api-url=https://sepolia.beaconstate.info
@@ -175,6 +211,9 @@ services:
       - --monitoring-port=8081
       - --disable-monitoring
       - --subscribe-all-data-subnets
+      - --enable-backfill
+      - --backfill-worker-count=4
+      - --backfill-batch-size=64
     logging:
       driver: "json-file"
       options:
