@@ -1,14 +1,15 @@
 #!/bin/bash
 # Ethereum Sepolia Node - Full Setup (stream extract, clean output)
 
-set -e
+# Don't exit on error immediately - let us handle it gracefully
+set +e
 
 ETHEREUM_DIR="/root/ethereum"
 EXECUTION_DIR="$ETHEREUM_DIR/execution"
 CONSENSUS_DIR="$ETHEREUM_DIR/consensus"
 JWT_FILE="$ETHEREUM_DIR/jwt.hex"
 DOCKER_COMPOSE_FILE="$ETHEREUM_DIR/docker-compose.yml"
-SNAPSHOT_URL="https://snapshots.ethpandaops.io/sepolia/besu/9530000/snapshot.tar.zst"
+SNAPSHOT_URL="https://snapshots.ethpandaops.io/sepolia/besu/9540000/snapshot.tar.zst"
 
 echo ""
 echo "=========================================="
@@ -27,13 +28,22 @@ else
     echo "✅ zstd already installed."
 fi
 
-if ! command -v axel &> /dev/null; then
-    echo "⚠️  axel not found. Installing..."
+if ! command -v pv &> /dev/null; then
+    echo "⚠️  pv not found. Installing..."
     apt-get update -qq >/dev/null 2>&1
-    apt-get install -y axel >/dev/null 2>&1
-    echo "✅ axel installed."
+    apt-get install -y pv >/dev/null 2>&1
+    echo "✅ pv installed."
 else
-    echo "✅ axel already installed."
+    echo "✅ pv already installed."
+fi
+
+if ! command -v wget &> /dev/null; then
+    echo "⚠️  wget not found. Installing..."
+    apt-get update -qq >/dev/null 2>&1
+    apt-get install -y wget >/dev/null 2>&1
+    echo "✅ wget installed."
+else
+    echo "✅ wget already installed."
 fi
 echo ""
 
@@ -50,23 +60,36 @@ echo "✅ JWT secret generated."
 echo ""
 
 # 4️⃣ Stream download & extract snapshot directly (no temp file)
-echo "→ Downloading & extracting snapshot (this will take a while)..."
-echo "   Target directory: $EXECUTION_DIR"
-echo "   Snapshot: block 9530000 (Oct 30, 2025)"
-cd "$EXECUTION_DIR"
+# Check if snapshot already exists
+if [ -d "$EXECUTION_DIR/database" ] && [ "$(ls -A $EXECUTION_DIR/database/*.sst 2>/dev/null | wc -l)" -gt 0 ]; then
+    echo "→ Snapshot already extracted, skipping download..."
+    echo "   Database found at: $EXECUTION_DIR/database"
+else
+    echo "→ Downloading & extracting snapshot (this will take a while)..."
+    echo "   Target directory: $EXECUTION_DIR"
+    echo "   Snapshot: block 9540000"
+    cd "$EXECUTION_DIR"
+    
+    # Stream: download -> progress -> decompress -> extract (never saves compressed file)
+    wget -q -O - "$SNAPSHOT_URL" | \
+      pv | \
+      zstd -d -T0 | \
+      tar -xf - -C "$EXECUTION_DIR"
+    
+    if [ $? -ne 0 ]; then
+        echo ""
+        echo "❌ ERROR: Snapshot download/extraction failed!"
+        echo "   Please check your internet connection and try again."
+        exit 1
+    fi
+    
+    echo ""
+    echo "✅ Snapshot downloaded and extracted (compressed file not saved)."
+    echo ""
+fi
 
-# Stream: download -> decompress -> extract (never saves compressed file)
-# Using axel for parallel downloads (much faster than wget)
-# -n 10: Use 10 parallel connections
-# -o -: Output to stdout for streaming
-# -a: Alternate progress bar
-# --insecure: Skip SSL certificate verification (like --no-check-certificate)
-axel --num-connections=10 --output=- --alternate --insecure "$SNAPSHOT_URL" | \
-  tar -I zstd -xvf - -C "$EXECUTION_DIR"
-
-echo ""
-echo "✅ Snapshot downloaded and extracted (compressed file not saved)."
-echo ""
+# Re-enable exit on error for rest of script
+set -e
 
 # Verify extraction completed
 echo "→ Verifying snapshot extraction..."
