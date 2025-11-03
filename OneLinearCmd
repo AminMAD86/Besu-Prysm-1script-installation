@@ -10,7 +10,7 @@ CONSENSUS_DIR="$ETHEREUM_DIR/consensus"
 JWT_FILE="$ETHEREUM_DIR/jwt.hex"
 DOCKER_COMPOSE_FILE="$ETHEREUM_DIR/docker-compose.yml"
 BESU_SNAPSHOT_URL="https://snapshots.ethpandaops.io/sepolia/besu/9540000/snapshot.tar.zst"
-PRYSM_SNAPSHOT_URL="https://snapshots.publicnode.com/ethereum-sepolia-prysm-8857876.tar.lz4"
+PRYSM_SNAPSHOT_URL="https://snapshots.publicnode.com/ethereum-sepolia-prysm-8865077.tar.lz4"
 
 echo ""
 echo "=========================================="
@@ -104,7 +104,7 @@ if [ -d "$CONSENSUS_DIR/beaconchaindata" ] && [ -f "$CONSENSUS_DIR/beaconchainda
 else
     echo "→ Downloading & extracting Prysm snapshot (optional but faster)..."
     echo "   Target directory: $CONSENSUS_DIR"
-    echo "   Snapshot: slot 8857876 (closer to current head = less forkchoice errors)"
+    echo "   Snapshot: slot 8865077 (closer to current head = less forkchoice errors)"
     cd "$CONSENSUS_DIR"
     
     # Stream: download -> progress -> decompress -> extract (never saves compressed file)
@@ -186,14 +186,14 @@ services:
     container_name: prysm
     network_mode: host
     restart: unless-stopped
-    volumes:
-      - /root/ethereum/consensus:/data
-      - /root/ethereum/jwt.hex:/data/jwt.hex
     depends_on:
       - besu
     ports:
       - 4000:4000
       - 3500:3500
+    volumes:
+      - /root/ethereum/consensus:/data
+      - /root/ethereum/jwt.hex:/data/jwt.hex
     command:
       - --sepolia
       - --execution-endpoint=http://127.0.0.1:8551
