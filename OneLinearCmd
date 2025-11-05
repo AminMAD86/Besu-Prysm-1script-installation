@@ -163,6 +163,8 @@ services:
       - --sync-mode=SNAP
       - --snapsync-server-enabled
       - --history-expiry-prune
+      - --bonsai-limit-trie-logs-enabled=true
+      - --bonsai-historical-block-limit=32768
       - --rpc-http-enabled=true
       - --rpc-http-host=0.0.0.0
       - --rpc-http-port=8545
@@ -211,9 +213,11 @@ services:
       - --monitoring-port=8081
       - --disable-monitoring
       - --subscribe-all-data-subnets
+      - --beacon-db-pruning
+      - --pruner-retention-epochs=8192
       - --enable-backfill
-      - --backfill-worker-count=4
-      - --backfill-batch-size=64
+      - --backfill-worker-count=2
+      - --backfill-batch-size=32
     logging:
       driver: "json-file"
       options:
