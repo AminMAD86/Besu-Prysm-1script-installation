@@ -9,7 +9,7 @@ EXECUTION_DIR="$ETHEREUM_DIR/execution"
 CONSENSUS_DIR="$ETHEREUM_DIR/consensus"
 JWT_FILE="$ETHEREUM_DIR/jwt.hex"
 DOCKER_COMPOSE_FILE="$ETHEREUM_DIR/docker-compose.yml"
-BESU_SNAPSHOT_URL="https://snapshots.ethpandaops.io/sepolia/besu/9540000/snapshot.tar.zst"
+BESU_SNAPSHOT_URL="https://snapshots.ethpandaops.io/sepolia/besu/9560000/snapshot.tar.zst"
 PRYSM_SNAPSHOT_URL="https://snapshots.publicnode.com/ethereum-sepolia-prysm-8865077.tar.lz4"
 
 echo ""
@@ -77,7 +77,7 @@ if [ -d "$EXECUTION_DIR/database" ] && [ "$(ls -A $EXECUTION_DIR/database/*.sst 
 else
     echo "→ Downloading & extracting Besu snapshot (this will take a while)..."
     echo "   Target directory: $EXECUTION_DIR"
-    echo "   Snapshot: block 9540000"
+    echo "   Snapshot: block 9560000"
     cd "$EXECUTION_DIR"
     
     # Stream: download -> progress -> decompress -> extract (never saves compressed file)
