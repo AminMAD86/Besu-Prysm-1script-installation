@@ -214,11 +214,8 @@ services:
       - --monitoring-port=8081
       - --disable-monitoring
       - --subscribe-all-data-subnets
+      - --blob-storage-layout=by-epoch
       - --beacon-db-pruning
-      - --pruner-retention-epochs=8192
-      - --enable-backfill
-      - --backfill-worker-count=2
-      - --backfill-batch-size=32
     logging:
       driver: "json-file"
       options:
