@@ -165,6 +165,7 @@ services:
       - --history-expiry-prune
       - --bonsai-limit-trie-logs-enabled=true
       - --bonsai-historical-block-limit=32768
+      - --bonsai-trie-logs-pruning-window-size=65536
       - --rpc-http-enabled=true
       - --rpc-http-host=0.0.0.0
       - --rpc-http-port=8545
