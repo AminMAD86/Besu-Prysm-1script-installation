@@ -9,7 +9,7 @@ EXECUTION_DIR="$ETHEREUM_DIR/execution"
 CONSENSUS_DIR="$ETHEREUM_DIR/consensus"
 JWT_FILE="$ETHEREUM_DIR/jwt.hex"
 DOCKER_COMPOSE_FILE="$ETHEREUM_DIR/docker-compose.yml"
-BESU_SNAPSHOT_URL="https://snapshots.ethpandaops.io/sepolia/besu/9560000/snapshot.tar.zst"
+BESU_SNAPSHOT_URL="https://snapshots.ethpandaops.io/sepolia/besu/9590000/snapshot.tar.zst"
 PRYSM_SNAPSHOT_URL="https://snapshots.publicnode.com/ethereum-sepolia-prysm-8865077.tar.lz4"
 
 echo ""
@@ -77,7 +77,7 @@ if [ -d "$EXECUTION_DIR/database" ] && [ "$(ls -A $EXECUTION_DIR/database/*.sst 
 else
     echo "→ Downloading & extracting Besu snapshot (this will take a while)..."
     echo "   Target directory: $EXECUTION_DIR"
-    echo "   Snapshot: block 9560000"
+    echo "   Snapshot: block 9590000 (Nov 9, 2025)"
     cd "$EXECUTION_DIR"
     
     # Stream: download -> progress -> decompress -> extract (never saves compressed file)
@@ -143,10 +143,12 @@ echo "→ Creating docker-compose.yml..."
 cat > "$DOCKER_COMPOSE_FILE" << 'EOF'
 services:
   besu:
-    image: hyperledger/besu:25.10.0
+    image: hyperledger/besu:25.11.0
     container_name: besu
     network_mode: host
     restart: unless-stopped
+    environment:
+      - JAVA_OPTS=-Xmx8g -Xms8g
     ports:
       - 30303:30303
       - 30303:30303/udp
@@ -161,11 +163,9 @@ services:
       - --data-path=/data
       - --data-storage-format=BONSAI
       - --sync-mode=SNAP
-      - --snapsync-server-enabled
-      - --history-expiry-prune
       - --bonsai-limit-trie-logs-enabled=true
-      - --bonsai-historical-block-limit=32768
-      - --bonsai-trie-logs-pruning-window-size=65536
+      - --bonsai-historical-block-limit=2048
+      - --bonsai-trie-logs-pruning-window-size=30000
       - --rpc-http-enabled=true
       - --rpc-http-host=0.0.0.0
       - --rpc-http-port=8545
@@ -178,6 +178,7 @@ services:
       - --engine-host-allowlist=*
       - --engine-jwt-secret=/data/jwt.hex
       - --engine-rpc-port=8551
+      - --nat-method=DOCKER
     logging:
       driver: "json-file"
       options:
@@ -199,23 +200,19 @@ services:
       - /root/ethereum/jwt.hex:/data/jwt.hex
     command:
       - --sepolia
-      - --execution-endpoint=http://127.0.0.1:8551
-      - --engine-endpoint-timeout-seconds=60
-      - --jwt-secret=/data/jwt.hex
-      - --checkpoint-sync-url=https://sepolia.beaconstate.info
-      - --genesis-beacon-api-url=https://sepolia.beaconstate.info
       - --accept-terms-of-use
       - --datadir=/data
+      - --disable-monitoring
       - --rpc-host=0.0.0.0
+      - --execution-endpoint=http://127.0.0.1:8551
+      - --jwt-secret=/data/jwt.hex
       - --rpc-port=4000
       - --grpc-gateway-corsdomain=*
       - --grpc-gateway-host=0.0.0.0
       - --grpc-gateway-port=3500
-      - --monitoring-port=8081
-      - --disable-monitoring
-      - --subscribe-all-data-subnets
-      - --blob-storage-layout=by-epoch
-      - --beacon-db-pruning
+      - --min-sync-peers=3
+      - --checkpoint-sync-url=https://checkpoint-sync.sepolia.ethpandaops.io
+      - --genesis-beacon-api-url=https://checkpoint-sync.sepolia.ethpandaops.io
     logging:
       driver: "json-file"
       options:
