@@ -190,14 +190,16 @@ services:
     container_name: prysm
     network_mode: host
     restart: unless-stopped
+    volumes:
+      - /root/ethereum/consensus:/data
+      - /root/ethereum/jwt.hex:/data/jwt.hex
     depends_on:
       - besu
     ports:
       - 4000:4000
       - 3500:3500
-    volumes:
-      - /root/ethereum/consensus:/data
-      - /root/ethereum/jwt.hex:/data/jwt.hex
+      - 13000:13000
+      - 12000:12000/udp
     command:
       - --sepolia
       - --accept-terms-of-use
@@ -213,6 +215,10 @@ services:
       - --min-sync-peers=3
       - --checkpoint-sync-url=https://checkpoint-sync.sepolia.ethpandaops.io
       - --genesis-beacon-api-url=https://checkpoint-sync.sepolia.ethpandaops.io
+      - --p2p-tcp-port=13000
+      - --p2p-udp-port=12000
+      - --subscribe-all-data-subnets
+      - --blob-retention-epochs=8192
     logging:
       driver: "json-file"
       options:
